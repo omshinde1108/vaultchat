@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VaultChat — E2E Encrypted P2P Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root {
+  --bg: #0a0c10;
+  --bg2: #111318;
+  --bg3: #181b22;
+  --bg4: #1e2129;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --accent: #00d4aa;
+  --accent2: #00b090;
+  --accent-glow: rgba(0,212,170,0.15);
+  --danger: #ff4d6d;
+  --warn: #fbbf24;
+  --text: #e8eaf0;
+  --text2: #8b8fa8;
+  --text3: #5a5e72;
+  --bubble-me: #1a3a32;
+  --bubble-them: #1e2129;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font: 'DM Sans', sans-serif;
+  --radius: 16px;
+  --radius-sm: 8px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;width:100%;overflow:hidden;}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--text);
+  display:flex;
+  flex-direction:column;
+}
+
+/* ── Noise texture overlay ── */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:999;opacity:0.4;
+}
+
+/* ── Layout ── */
+#app{display:flex;height:100vh;width:100vw;}
+
+/* ── Sidebar ── */
+#sidebar{
+  width:300px;min-width:300px;
+  background:var(--bg2);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  padding:0;
+  position:relative;overflow:hidden;
+}
+#sidebar::before{
+  content:'';position:absolute;top:-80px;left:-80px;
+  width:280px;height:280px;
+  background:radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+  pointer-events:none;
+}
+
+.sidebar-header{
+  padding:20px 20px 16px;
+  border-bottom:1px solid var(--border);
+}
+.logo{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:16px;
+}
+.logo-icon{
+  width:32px;height:32px;
+  background:var(--accent);
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;
+}
+.logo-text{
+  font-family:var(--font-mono);
+  font-size:17px;font-weight:600;
+  color:var(--text);
+  letter-spacing:-0.5px;
+}
+.logo-text span{color:var(--accent);}
+
+.username-area{
+  display:flex;align-items:center;gap:8px;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:8px 10px;
+}
+.avatar{
+  width:28px;height:28px;border-radius:50%;
+  background:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:600;color:#000;
+  flex-shrink:0;
+}
+#username-input{
+  background:none;border:none;outline:none;
+  color:var(--text);font-family:var(--font);font-size:13px;
+  width:100%;
+}
+#username-input::placeholder{color:var(--text3);}
+
+/* ── Room Section ── */
+.section-label{
+  font-size:10px;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--text3);font-family:var(--font-mono);
+  padding:16px 20px 8px;
+}
+.room-controls{padding:0 20px 16px;}
+.input-row{
+  display:flex;gap:6px;margin-bottom:8px;
+}
+.room-input{
+  flex:1;
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:9px 12px;
+  color:var(--text);font-family:var(--font-mono);font-size:12px;
+  outline:none;transition:border-color 0.2s;
+}
+.room-input:focus{border-color:var(--accent);}
+.room-input::placeholder{color:var(--text3);}
+
+.btn{
+  padding:9px 14px;
+  border-radius:var(--radius-sm);
+  border:none;cursor:pointer;
+  font-family:var(--font);font-size:13px;font-weight:500;
+  transition:all 0.15s;
+  white-space:nowrap;
+}
+.btn-primary{background:var(--accent);color:#000;}
+.btn-primary:hover{background:#00e8ba;transform:translateY(-1px);}
+.btn-primary:active{transform:translateY(0);}
+.btn-secondary{background:var(--bg4);color:var(--text2);border:1px solid var(--border);}
+.btn-secondary:hover{background:var(--bg3);color:var(--text);}
+.btn-danger{background:var(--danger);color:#fff;}
+.btn-danger:hover{opacity:0.85;}
+.btn-sm{padding:6px 10px;font-size:12px;}
+.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;}
+
+/* ── Status indicators ── */
+#status-bar{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 20px;
+  background:var(--bg3);
+  border-top:1px solid var(--border);
+  margin-top:auto;
+}
+.status-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--text3);
+  transition:background 0.3s;
+  flex-shrink:0;
+}
+.status-dot.connected{background:var(--accent);box-shadow:0 0 6px var(--accent);}
+.status-dot.connecting{background:var(--warn);animation:pulse 1s infinite;}
+.status-dot.error{background:var(--danger);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+#status-text{font-size:12px;color:var(--text2);font-family:var(--font-mono);}
+
+/* ── Chat Area ── */
+#chat-area{
+  flex:1;display:flex;flex-direction:column;
+  background:var(--bg);overflow:hidden;
+}
+
+/* ── Top bar ── */
+#topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg2);
+  flex-shrink:0;
+}
+.topbar-left{display:flex;flex-direction:column;gap:2px;}
+#peer-name{font-size:15px;font-weight:500;}
+#peer-status{font-size:11px;color:var(--text3);font-family:var(--font-mono);}
+.topbar-right{display:flex;gap:8px;align-items:center;}
+
+.icon-btn{
+  width:34px;height:34px;
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all 0.15s;color:var(--text2);
+  font-size:15px;
+}
+.icon-btn:hover{background:var(--bg4);color:var(--text);border-color:var(--border2);}
+
+/* ── Encryption banner ── */
+#enc-banner{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 20px;
+  background:rgba(0,212,170,0.05);
+  border-bottom:1px solid rgba(0,212,170,0.1);
+  flex-shrink:0;
+}
+#enc-banner span{font-size:11px;color:var(--accent);font-family:var(--font-mono);}
+
+/* ── Messages ── */
+#messages{
+  flex:1;overflow-y:auto;
+  padding:20px;
+  display:flex;flex-direction:column;gap:4px;
+}
+#messages::-webkit-scrollbar{width:4px;}
+#messages::-webkit-scrollbar-track{background:transparent;}
+#messages::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+
+/* ── Welcome screen ── */
+#welcome{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:16px;text-align:center;padding:40px;
+}
+.welcome-icon{
+  font-size:48px;
+  background:var(--bg3);
+  width:88px;height:88px;
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border);
+}
+.welcome-title{font-size:22px;font-weight:500;}
+.welcome-sub{font-size:14px;color:var(--text2);max-width:320px;line-height:1.6;}
+.badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 10px;border-radius:20px;
+  font-size:11px;font-family:var(--font-mono);
+  background:var(--accent-glow);color:var(--accent);
+  border:1px solid rgba(0,212,170,0.2);
+}
+
+/* ── Message bubbles ── */
+.msg-group{display:flex;flex-direction:column;gap:2px;}
+.msg-row{display:flex;align-items:flex-end;gap:8px;}
+.msg-row.me{flex-direction:row-reverse;}
+.msg-avatar{
+  width:24px;height:24px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:600;
+  flex-shrink:0;margin-bottom:2px;
+}
+.bubble{
+  max-width:65%;
+  padding:10px 14px;
+  border-radius:16px;
+  font-size:14px;line-height:1.5;
+  word-break:break-word;
+  position:relative;
+  animation:bubbleIn 0.2s ease;
+}
+@keyframes bubbleIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.bubble.me{
+  background:var(--bubble-me);
+  border:1px solid rgba(0,212,170,0.15);
+  border-bottom-right-radius:4px;
+  color:var(--text);
+}
+.bubble.them{
+  background:var(--bubble-them);
+  border:1px solid var(--border);
+  border-bottom-left-radius:4px;
+  color:var(--text);
+}
+.bubble-meta{
+  display:flex;align-items:center;gap:6px;margin-top:4px;
+}
+.msg-time{font-size:10px;color:var(--text3);font-family:var(--font-mono);}
+.msg-enc{font-size:9px;color:var(--accent);opacity:0.6;}
+
+.sys-msg{
+  text-align:center;
+  font-size:11px;color:var(--text3);
+  font-family:var(--font-mono);
+  padding:8px 0;
+}
+
+/* ── Input bar ── */
+#input-bar{
+  display:flex;align-items:flex-end;gap:10px;
+  padding:14px 20px;
+  border-top:1px solid var(--border);
+  background:var(--bg2);
+  flex-shrink:0;
+}
+#msg-input{
+  flex:1;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:10px 16px;
+  color:var(--text);
+  font-family:var(--font);font-size:14px;
+  outline:none;resize:none;
+  max-height:120px;min-height:42px;
+  line-height:1.5;
+  transition:border-color 0.2s;
+}
+#msg-input:focus{border-color:var(--accent);}
+#msg-input::placeholder{color:var(--text3);}
+#msg-input:disabled{opacity:0.4;}
+#send-btn{
+  width:42px;height:42px;
+  background:var(--accent);
+  border:none;border-radius:10px;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s;flex-shrink:0;
+}
+#send-btn:hover{background:#00e8ba;transform:scale(1.05);}
+#send-btn:disabled{opacity:0.3;cursor:not-allowed;transform:none;}
+#send-btn svg{width:18px;height:18px;fill:none;stroke:#000;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+
+/* ── Modals ── */
+.modal-overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,0.7);
+  display:flex;align-items:center;justify-content:center;
+  z-index:100;
+  backdrop-filter:blur(4px);
+  animation:fadeIn 0.15s ease;
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{
+  background:var(--bg2);
+  border:1px solid var(--border2);
+  border-radius:var(--radius);
+  padding:24px;
+  width:90%;max-width:480px;
+  animation:slideUp 0.2s ease;
+  position:relative;
+}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-title{font-size:17px;font-weight:500;margin-bottom:6px;}
+.modal-sub{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.5;}
+.modal-close{
+  position:absolute;top:16px;right:16px;
+  width:28px;height:28px;
+  background:var(--bg4);border:none;border-radius:6px;
+  color:var(--text2);cursor:pointer;font-size:16px;
+  display:flex;align-items:center;justify-content:center;
+}
+.modal-close:hover{color:var(--text);}
+
+.code-block{
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:12px;
+  font-family:var(--font-mono);font-size:11px;
+  color:var(--accent);
+  word-break:break-all;
+  max-height:120px;overflow-y:auto;
+  margin-bottom:10px;
+  line-height:1.6;
+}
+.code-block::-webkit-scrollbar{width:3px;}
+.code-block::-webkit-scrollbar-thumb{background:var(--border2);}
+
+.textarea-sdp{
+  width:100%;height:100px;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:10px;color:var(--text);
+  font-family:var(--font-mono);font-size:10px;
+  outline:none;resize:vertical;
+  transition:border-color 0.2s;
+  margin-bottom:10px;
+}
+.textarea-sdp:focus{border-color:var(--accent);}
+.textarea-sdp::placeholder{color:var(--text3);}
+
+#qr-container{
+  display:flex;justify-content:center;
+  padding:16px;margin:10px 0;
+  background:white;border-radius:var(--radius-sm);
+}
+
+/* ── QR / share modal ── */
+.share-link{
+  display:flex;gap:6px;margin-bottom:12px;align-items:center;
+}
+.share-link-text{
+  flex:1;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:8px 10px;
+  font-family:var(--font-mono);font-size:10px;
+  color:var(--accent);word-break:break-all;
+}
+
+/* ── Dark mode toggle ── */
+.light-mode{
+  --bg:#f5f5f0;--bg2:#ffffff;--bg3:#f0f0eb;--bg4:#e8e8e3;
+  --border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.14);
+  --text:#1a1a1a;--text2:#666;--text3:#aaa;
+  --bubble-me:#d4f5ec;--bubble-them:#f5f5f0;
+}
+
+/* ── Responsive ── */
+@media(max-width:640px){
+  #sidebar{
+    position:absolute;left:-300px;top:0;bottom:0;
+    z-index:50;transition:left 0.25s;
+  }
+  #sidebar.open{left:0;}
+  #app{flex-direction:column;}
+}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  background:var(--bg3);border:1px solid var(--border2);
+  border-radius:var(--radius-sm);
+  padding:8px 16px;font-size:13px;color:var(--text);
+  z-index:200;animation:toastIn 0.2s ease;
+  box-shadow:0 4px 20px rgba(0,0,0,0.4);
+  pointer-events:none;
+}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* ── Steps guide in sidebar ── */
+.step-list{padding:0 20px 16px;}
+.step-item{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:6px 0;
+  border-bottom:1px solid var(--border);
+}
+.step-item:last-child{border-bottom:none;}
+.step-num{
+  width:18px;height:18px;border-radius:50%;
+  background:var(--accent);color:#000;
+  font-size:10px;font-weight:600;font-family:var(--font-mono);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:1px;
+}
+.step-text{font-size:12px;color:var(--text2);line-height:1.5;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ SIDEBAR ══ -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">🔐</div>
+        <div class="logo-text">Vault<span>Chat</span></div>
+      </div>
+      <div class="username-area">
+        <div class="avatar" id="user-avatar">A</div>
+        <input id="username-input" type="text" placeholder="Your username…" maxlength="20"/>
+      </div>
+    </div>
+
+    <div class="section-label">Room</div>
+    <div class="room-controls">
+      <div class="input-row">
+        <input id="room-input" class="room-input" type="text" placeholder="room-id…"/>
+        <button class="btn btn-primary btn-sm" onclick="createRoom()">New</button>
+      </div>
+      <button class="btn btn-secondary" style="width:100%;margin-bottom:6px;" onclick="showJoinModal()">Join existing room</button>
+      <button class="btn btn-secondary" style="width:100%;" id="share-btn" onclick="showShareModal()" disabled>Share room link</button>
+    </div>
+
+    <div class="section-label">How it works</div>
+    <div class="step-list">
+      <div class="step-item"><div class="step-num">1</div><div class="step-text">Create a room → share the link or ID with your peer</div></div>
+      <div class="step-item"><div class="step-num">2</div><div class="step-text">Peer joins → ECDH key exchange happens automatically</div></div>
+      <div class="step-item"><div class="step-num">3</div><div class="step-text">All messages encrypted with AES-GCM before sending</div></div>
+      <div class="step-item"><div class="step-num">4</div><div class="step-text">History saved locally in IndexedDB</div></div>
+    </div>
+
+    <div id="status-bar">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">disconnected</span>
+    </div>
+  </div>
+
+  <!-- ══ CHAT AREA ══ -->
+  <div id="chat-area">
+    <div id="topbar">
+      <div class="topbar-left">
+        <div id="peer-name" style="color:var(--text2)">No active room</div>
+        <div id="peer-status">start or join a room to begin</div>
+      </div>
+      <div class="topbar-right">
+        <div class="icon-btn" title="Toggle dark/light" onclick="toggleTheme()">☀️</div>
+        <div class="icon-btn" title="Clear chat" onclick="clearChat()">🗑️</div>
+      </div>
+    </div>
+
+    <div id="enc-banner" style="display:none">
+      <span>🔒</span>
+      <span id="enc-info">End-to-end encrypted · AES-GCM 256-bit · ECDH key exchange</span>
+    </div>
+
+    <!-- Welcome splash -->
+    <div id="welcome">
+      <div class="welcome-icon">🔐</div>
+      <div class="welcome-title">Encrypted. Serverless. Private.</div>
+      <div class="welcome-sub">Messages are encrypted on your device before sending. No server ever sees your plaintext. Peer-to-peer via WebRTC.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px;">
+        <span class="badge">🔒 AES-GCM 256</span>
+        <span class="badge">🔑 ECDH P-384</span>
+        <span class="badge">⚡ WebRTC P2P</span>
+        <span class="badge">💾 IndexedDB</span>
+      </div>
+    </div>
+
+    <!-- Messages container (hidden initially) -->
+    <div id="messages" style="display:none"></div>
+
+    <!-- Input bar -->
+    <div id="input-bar">
+      <textarea id="msg-input" placeholder="Type a message… (Enter to send)" rows="1" disabled></textarea>
+      <button id="send-btn" onclick="sendMessage()" disabled>
+        <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ JOIN MODAL ══ -->
+<div id="join-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('join-modal')">✕</button>
+    <div class="modal-title">Join a Room</div>
+    <div class="modal-sub">Enter the room ID or paste the invite link shared by your peer.</div>
+    <input id="join-room-input" class="room-input" style="width:100%;margin-bottom:10px;" type="text" placeholder="room-id or full link…"/>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" style="flex:1" onclick="joinRoom()">Join Room</button>
+      <button class="btn btn-secondary" onclick="closeModal('join-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SDP SIGNALING MODAL (manual fallback) ══ -->
+<div id="sdp-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('sdp-modal')">✕</button>
+    <div class="modal-title" id="sdp-modal-title">Share your offer</div>
+    <div class="modal-sub" id="sdp-modal-sub">Copy this offer and send it to your peer. Then paste their answer below.</div>
+    <div class="code-block" id="sdp-output">Generating…</div>
+    <button class="btn btn-secondary btn-sm" style="margin-bottom:12px;" onclick="copyText('sdp-output')">Copy</button>
+    <div id="sdp-answer-section">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">Paste peer's answer / offer here:</div>
+      <textarea id="sdp-input" class="textarea-sdp" placeholder="Paste SDP here…"></textarea>
+      <button class="btn btn-primary" style="width:100%" onclick="processSDP()">Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SHARE MODAL ══ -->
+<div id="share-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('share-modal')">✕</button>
+    <div class="modal-title">Invite to Room</div>
+    <div class="modal-sub">Share this link or QR code with your peer.</div>
+    <div class="share-link">
+      <div class="share-link-text" id="share-link-text"></div>
+      <button class="btn btn-secondary btn-sm" onclick="copyShareLink()">Copy</button>
+    </div>
+    <div id="qr-container"><div id="qr-code"></div></div>
+    <div style="margin-top:12px;font-size:12px;color:var(--text2);">
+      ℹ️ Once they join, WebRTC connection is established and encrypted automatically.
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  VaultChat — E2E Encrypted WebRTC Chat
+//  Architecture: WebRTC DataChannel + AES-GCM + ECDH
+// ════════════════════════════════════════════════════════
+
+const DB_NAME = 'vaultchat';
+const DB_VER = 1;
+let db = null;
+let currentRoomId = null;
+let myUsername = 'User_' + Math.random().toString(36).slice(2,6).toUpperCase();
+let peer = null;         // PeerJS peer
+let conn = null;         // PeerJS DataConnection
+let isInitiator = false;
+let encKey = null;       // AES-GCM derived key
+let myKeyPair = null;    // ECDH key pair
+let darkMode = true;
+
+// ── Username ──────────────────────────────────────────
+const usernameInput = document.getElementById('username-input');
+usernameInput.value = myUsername;
+updateAvatar(myUsername);
+usernameInput.addEventListener('input', () => {
+  myUsername = usernameInput.value || 'Anonymous';
+  updateAvatar(myUsername);
+});
+function updateAvatar(name) {
+  document.getElementById('user-avatar').textContent = name[0].toUpperCase();
+}
+
+// ── Theme ─────────────────────────────────────────────
+function toggleTheme() {
+  darkMode = !darkMode;
+  document.body.classList.toggle('light-mode', !darkMode);
+}
+
+// ── IndexedDB ─────────────────────────────────────────
+function initDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('messages')) {
+        const store = d.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
+        store.createIndex('roomId', 'roomId', { unique: false });
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; res(); };
+    req.onerror = () => rej(req.error);
+  });
+}
+
+function saveMessage(roomId, msg) {
+  if (!db) return;
+  const tx = db.transaction('messages', 'readwrite');
+  tx.objectStore('messages').add({ roomId, ...msg, ts: Date.now() });
+}
+
+function loadMessages(roomId) {
+  return new Promise((res) => {
+    if (!db) return res([]);
+    const tx = db.transaction('messages', 'readonly');
+    const idx = tx.objectStore('messages').index('roomId');
+    const req = idx.getAll(roomId);
+    req.onsuccess = () => res(req.result || []);
+    req.onerror = () => res([]);
+  });
+}
+
+function clearRoomMessages(roomId) {
+  if (!db) return;
+  const tx = db.transaction('messages', 'readwrite');
+  const idx = tx.objectStore('messages').index('roomId');
+  const req = idx.getAllKeys(roomId);
+  req.onsuccess = () => {
+    const store = tx.objectStore('messages');
+    req.result.forEach(k => store.delete(k));
+  };
+}
+
+// ── Crypto ────────────────────────────────────────────
+async function generateKeyPair() {
+  myKeyPair = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-384' },
+    true, ['deriveKey']
+  );
+  return myKeyPair;
+}
+
+async function exportPublicKey(kp) {
+  const raw = await crypto.subtle.exportKey('raw', kp.publicKey);
+  return btoa(String.fromCharCode(...new Uint8Array(raw)));
+}
+
+async function importPublicKey(b64) {
+  const raw = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  return crypto.subtle.importKey('raw', raw, { name: 'ECDH', namedCurve: 'P-384' }, true, []);
+}
+
+async function deriveSharedKey(peerPubKey) {
+  encKey = await crypto.subtle.deriveKey(
+    { name: 'ECDH', public: peerPubKey },
+    myKeyPair.privateKey,
+    { name: 'AES-GCM', length: 256 },
+    false, ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptMessage(text) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const enc = new TextEncoder();
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    encKey,
+    enc.encode(text)
+  );
+  const buf = new Uint8Array(iv.byteLength + ciphertext.byteLength);
+  buf.set(iv, 0);
+  buf.set(new Uint8Array(ciphertext), iv.byteLength);
+  return btoa(String.fromCharCode(...buf));
+}
+
+async function decryptMessage(b64) {
+  const buf = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const iv = buf.slice(0, 12);
+  const ct = buf.slice(12);
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, encKey, ct);
+  return new TextDecoder().decode(plain);
+}
+
+// ── PeerJS ────────────────────────────────────────────
+function loadPeerJS(cb) {
+  if (window.Peer) { cb(); return; }
+  const s = document.createElement('script');
+  s.src = 'https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js';
+  s.onload = cb;
+  document.head.appendChild(s);
+}
+
+function initPeer(id) {
+  return new Promise((res, rej) => {
+    loadPeerJS(() => {
+      peer = new Peer(id, {
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+          ]
+        }
+      });
+      peer.on('open', peerId => {
+        setStatus('waiting for peer…', 'connecting');
+        res(peerId);
+      });
+      peer.on('error', err => {
+        setStatus('error: ' + err.type, 'error');
+        rej(err);
+      });
+      peer.on('connection', handleIncomingConnection);
+    });
+  });
+}
+
+// ── Room ──────────────────────────────────────────────
+function genRoomId() {
+  const w = ['alpha','bravo','delta','echo','foxtrot','gamma','hotel','kilo','lima','nova','omega','sigma','zeta'];
+  return w[Math.floor(Math.random()*w.length)] + '-' + Math.floor(1000+Math.random()*9000);
+}
+
+async function createRoom() {
+  const id = document.getElementById('room-input').value.trim() || genRoomId();
+  document.getElementById('room-input').value = id;
+  currentRoomId = id;
+  isInitiator = true;
+
+  await generateKeyPair();
+  showChat();
+  setStatus('connecting…', 'connecting');
+
+  try {
+    await initPeer('vc-' + id + '-host');
+    document.getElementById('peer-name').textContent = '🏠 Room: ' + id;
+    document.getElementById('peer-status').textContent = 'waiting for peer to join…';
+    document.getElementById('share-btn').disabled = false;
+    showSysMsg('Room created. Share the link and wait for your peer.');
+    await loadHistory(id);
+  } catch(e) {
+    showSysMsg('Failed to create room: ' + e.message);
+    setStatus('error', 'error');
+  }
+}
+
+async function joinRoom() {
+  let id = document.getElementById('join-room-input').value.trim();
+  if (!id) { toast('Enter a room ID or link'); return; }
+  // extract ID from URL if needed
+  if (id.includes('room=')) {
+    try { id = new URL(id).searchParams.get('room'); } catch(e) {
+      id = id.split('room=')[1].split('&')[0];
+    }
+  }
+  closeModal('join-modal');
+  document.getElementById('room-input').value = id;
+  currentRoomId = id;
+  isInitiator = false;
+
+  await generateKeyPair();
+  showChat();
+  setStatus('connecting…', 'connecting');
+
+  try {
+    await initPeer('vc-' + id + '-guest-' + Math.random().toString(36).slice(2,6));
+    const c = peer.connect('vc-' + id + '-host', { reliable: true, serialization: 'json' });
+    setupConnection(c);
+    document.getElementById('peer-name').textContent = '🔗 Room: ' + id;
+    document.getElementById('peer-status').textContent = 'connecting…';
+    await loadHistory(id);
+  } catch(e) {
+    showSysMsg('Failed to join room: ' + e.message);
+    setStatus('error', 'error');
+  }
+}
+
+function handleIncomingConnection(c) {
+  setupConnection(c);
+}
+
+function setupConnection(c) {
+  conn = c;
+  c.on('open', async () => {
+    setStatus('handshaking…', 'connecting');
+    // Send our public key
+    const pubKey = await exportPublicKey(myKeyPair);
+    c.send({ type: 'key-exchange', pubKey, username: myUsername });
+  });
+
+  c.on('data', async (data) => {
+    if (data.type === 'key-exchange') {
+      // Derive shared secret
+      const peerPub = await importPublicKey(data.pubKey);
+      await deriveSharedKey(peerPub);
+
+      // Send ack with our key if we're the responder
+      if (!isInitiator) {
+        const pubKey = await exportPublicKey(myKeyPair);
+        c.send({ type: 'key-ack', pubKey, username: myUsername });
+      }
+
+      const peerName = data.username || 'Peer';
+      setStatus('connected · E2E encrypted', 'connected');
+      document.getElementById('peer-name').textContent = '💬 ' + peerName;
+      document.getElementById('peer-status').textContent = 'end-to-end encrypted · AES-GCM 256-bit';
+      document.getElementById('enc-banner').style.display = 'flex';
+      document.getElementById('msg-input').disabled = false;
+      document.getElementById('send-btn').disabled = false;
+      showSysMsg('🔐 Encrypted channel established with ' + peerName);
+      document.getElementById('share-btn').disabled = false;
+    } else if (data.type === 'key-ack') {
+      const peerPub = await importPublicKey(data.pubKey);
+      await deriveSharedKey(peerPub);
+      const peerName = data.username || 'Peer';
+      setStatus('connected · E2E encrypted', 'connected');
+      document.getElementById('peer-name').textContent = '💬 ' + peerName;
+      document.getElementById('peer-status').textContent = 'end-to-end encrypted · AES-GCM 256-bit';
+      document.getElementById('enc-banner').style.display = 'flex';
+      document.getElementById('msg-input').disabled = false;
+      document.getElementById('send-btn').disabled = false;
+      showSysMsg('🔐 Encrypted channel established with ' + peerName);
+    } else if (data.type === 'message') {
+      if (!encKey) return;
+      try {
+        const plain = await decryptMessage(data.ciphertext);
+        const msg = { text: plain, from: data.from, me: false, time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) };
+        appendMessage(msg);
+        saveMessage(currentRoomId, msg);
+      } catch(e) {
+        showSysMsg('⚠️ Failed to decrypt message');
+      }
+    }
+  });
+
+  c.on('close', () => {
+    setStatus('peer disconnected', 'error');
+    document.getElementById('peer-status').textContent = 'peer disconnected';
+    showSysMsg('Peer disconnected.');
+    document.getElementById('msg-input').disabled = true;
+    document.getElementById('send-btn').disabled = true;
+  });
+
+  c.on('error', (err) => {
+    setStatus('connection error', 'error');
+    showSysMsg('Connection error: ' + err.message);
+  });
+}
+
+// ── Send / Receive ────────────────────────────────────
+async function sendMessage() {
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text || !conn || !encKey) return;
+
+  try {
+    const ciphertext = await encryptMessage(text);
+    conn.send({ type: 'message', ciphertext, from: myUsername });
+    const msg = { text, from: myUsername, me: true, time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) };
+    appendMessage(msg);
+    saveMessage(currentRoomId, msg);
+    input.value = '';
+    input.style.height = 'auto';
+  } catch(e) {
+    toast('Encryption failed: ' + e.message);
+  }
+}
+
+// ── UI helpers ────────────────────────────────────────
+function showChat() {
+  document.getElementById('welcome').style.display = 'none';
+  document.getElementById('messages').style.display = 'flex';
+}
+
+function appendMessage(msg) {
+  const div = document.getElementById('messages');
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + (msg.me ? 'me' : '');
+
+  const avatar = document.createElement('div');
+  avatar.className = 'msg-avatar';
+  avatar.style.background = msg.me ? '#00d4aa' : '#8b5cf6';
+  avatar.style.color = '#000';
+  avatar.textContent = (msg.from||'?')[0].toUpperCase();
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble ' + (msg.me ? 'me' : 'them');
+  bubble.innerHTML = escapeHtml(msg.text).replace(/\n/g,'<br>');
+
+  const meta = document.createElement('div');
+  meta.className = 'bubble-meta';
+  meta.style.justifyContent = msg.me ? 'flex-end' : 'flex-start';
+  meta.innerHTML = `<span class="msg-time">${msg.time||''}</span><span class="msg-enc">🔒</span>`;
+
+  const wrap = document.createElement('div');
+  wrap.style.display = 'flex';
+  wrap.style.flexDirection = 'column';
+  wrap.style.alignItems = msg.me ? 'flex-end' : 'flex-start';
+  wrap.appendChild(bubble);
+  wrap.appendChild(meta);
+
+  if (!msg.me) row.appendChild(avatar);
+  row.appendChild(wrap);
+  if (msg.me) row.appendChild(avatar);
+
+  div.appendChild(row);
+  div.scrollTop = div.scrollHeight;
+}
+
+function showSysMsg(text) {
+  const div = document.getElementById('messages');
+  const el = document.createElement('div');
+  el.className = 'sys-msg';
+  el.textContent = text;
+  div.appendChild(el);
+  div.scrollTop = div.scrollHeight;
+}
+
+function setStatus(text, type='') {
+  document.getElementById('status-text').textContent = text;
+  const dot = document.getElementById('status-dot');
+  dot.className = 'status-dot ' + type;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function loadHistory(roomId) {
+  const msgs = await loadMessages(roomId);
+  if (msgs.length) {
+    showSysMsg('── Loaded ' + msgs.length + ' saved messages ──');
+    msgs.forEach(m => appendMessage(m));
+  }
+}
+
+function clearChat() {
+  if (!currentRoomId) return;
+  if (!confirm('Clear local chat history for this room?')) return;
+  clearRoomMessages(currentRoomId);
+  document.getElementById('messages').innerHTML = '';
+  showSysMsg('Chat history cleared.');
+}
+
+// ── Modals ────────────────────────────────────────────
+function showJoinModal() { document.getElementById('join-modal').style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+function showShareModal() {
+  if (!currentRoomId) return;
+  const link = location.origin + location.pathname + '?room=' + currentRoomId;
+  document.getElementById('share-link-text').textContent = link;
+  document.getElementById('qr-code').innerHTML = '';
+  new QRCode(document.getElementById('qr-code'), {
+    text: link, width: 160, height: 160,
+    colorDark: '#000', colorLight: '#fff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  document.getElementById('share-modal').style.display = 'flex';
+}
+
+function copyShareLink() {
+  const link = document.getElementById('share-link-text').textContent;
+  navigator.clipboard.writeText(link).then(() => toast('Link copied!'));
+}
+
+function copyText(id) {
+  navigator.clipboard.writeText(document.getElementById(id).textContent).then(() => toast('Copied!'));
+}
+
+function toast(msg) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+// ── Keyboard shortcuts ────────────────────────────────
+document.getElementById('msg-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+document.getElementById('msg-input').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+// ── URL params (auto-join from link) ─────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  await initDB();
+  const params = new URLSearchParams(location.search);
+  const roomParam = params.get('room');
+  if (roomParam) {
+    document.getElementById('join-room-input').value = roomParam;
+    showJoinModal();
+  }
+});
+
+// ── Close modal on overlay click ─────────────────────
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => {
+    if (e.target === el) closeModal(el.id);
+  });
+});
+</script>
+</body>
+</html>
